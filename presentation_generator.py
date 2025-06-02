@@ -1,12 +1,7 @@
-import os
-from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import List, Dict
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
 from dataclasses import dataclass
 
 from template_config import (
@@ -23,15 +18,21 @@ class JEP:
     title: str
     description: str = ""
     examples: List[Dict[str, str]] = None
+    
+    def __post_init__(self):
+        # Ensure examples is always a list
+        if self.examples is None:
+            self.examples = []
 
 class JDKRelease:
     def __init__(self, version: str, release_date: str, tagline: str):
         self.version = version
         self.release_date = release_date
         self.tagline = tagline
-        self.jeps: List[JEP] = []
+        self.jeps = []
     
     def add_jep(self, jep: JEP):
+        """Add a JEP to the release"""
         self.jeps.append(jep)
 
 class JDKPresentationGenerator:
