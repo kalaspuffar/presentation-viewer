@@ -83,6 +83,18 @@ class JDKPresentationGenerator:
         slide_height = self.prs.slide_height
         apply_example_slide_layout(self.current_slide, title, content, slide_height=slide_height)
     
+    def add_hardcoded_example_slide(self):
+        """Adds a hardcoded example slide to the end of the presentation."""
+        title = "Code Example: Hello World"
+        content = (
+            "public class HelloWorld {\n"
+            "    public static void main(String[] args) {\n"
+            "        System.out.println(\"Hello, JDK!\");\n"
+            "    }\n"
+            "}"
+        )
+        self.create_example_slide(title, content)
+    
     def generate_jdk_presentation(self, release: JDKRelease, output_path: str):
         """Generate the complete JDK release presentation"""
         # Create title slide
@@ -91,6 +103,9 @@ class JDKPresentationGenerator:
         # Create slides for each JEP
         for jep in release.jeps:
             self.create_jep_slide(jep)
+        
+        # Add the hardcoded example slide at the end
+        self.add_hardcoded_example_slide()
         
         # Save the presentation
         self.save_presentation(output_path)
