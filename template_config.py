@@ -1,6 +1,7 @@
 from pptx.util import Pt, Inches
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR, MSO_AUTO_SIZE
 from pptx.dml.color import RGBColor
+import re
 
 # Colors
 ORANGE = RGBColor(255, 87, 34)  # FF5722
@@ -110,9 +111,11 @@ def apply_jep_slide_layout(slide, jep_number, jep_title, jep_description=None, s
     number.font.color.rgb = WHITE
     number.alignment = PP_ALIGN.LEFT
     
+    clean_title = re.sub(r'\s+', ' ', jep_title.replace('\r', ' ').replace('\n', ' ')).strip()
+
     # Add JEP title
     title = text_frame.add_paragraph()
-    title.text = jep_title
+    title.text = clean_title
     title.font.name = BODY_FONT
     title.font.size = SUBTITLE_FONT_SIZE
     title.font.color.rgb = WHITE
