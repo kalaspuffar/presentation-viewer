@@ -1,5 +1,8 @@
 <?php
 
+// IMPORTANT: Always use require_once, never require, to avoid re-running
+// the PDO constructor and DDL statements on repeated inclusion.
+
 // Path to the SQLite database, resolved relative to this file so it works
 // regardless of which www/ subdirectory requires this file.
 define('DB_PATH', __DIR__ . '/../var/presentation.db');
