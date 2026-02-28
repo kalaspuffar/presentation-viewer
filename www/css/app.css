@@ -1,1 +1,405 @@
-/* app.css — placeholder */
+/* ==========================================================================
+   app.css — Editor Layout & Theme
+   JEP Presenter — Phase 3: Sidebar & Edit Pane
+   ========================================================================== */
+
+/* ==========================================================================
+   1.1 Global Reset
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ==========================================================================
+   1.2 Base Body
+   ========================================================================== */
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background: #FF5722;
+    color: #FFFFFF;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   1.3–1.5 Header
+   ========================================================================== */
+
+#app-header {
+    background: #FF5722;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+}
+
+#header-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: #FFFFFF;
+}
+
+#header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* ==========================================================================
+   1.6–1.9 Primary Action Buttons (#btn-generate-new, #btn-present, #btn-generate)
+   ========================================================================== */
+
+#btn-generate-new,
+#btn-present,
+#btn-generate {
+    background: #212121;
+    color: #FFFFFF;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+
+#btn-generate-new:hover,
+#btn-present:hover,
+#btn-generate:hover {
+    background: #424242;
+}
+
+/* 1.7 */
+#btn-generate-new {
+    font-size: 0.85rem;
+    padding: 6px 14px;
+}
+
+/* 1.8 */
+#btn-present {
+    font-size: 0.95rem;
+    padding: 10px 20px;
+}
+
+/* ==========================================================================
+   1.10 App Main Layout
+   ========================================================================== */
+
+#app-main {
+    display: flex;
+    height: calc(100vh - 52px);
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   1.11–1.16 Sidebar
+   ========================================================================== */
+
+#sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    background: #E64A19;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+#sidebar ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+}
+
+#sidebar li {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s ease;
+}
+
+#sidebar li:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-item.active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-label {
+    flex: 1;
+    font-size: 0.9rem;
+    color: #FFFFFF;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   1.17–1.19 Sidebar Micro-controls (▲ ▼ ✕)
+   ========================================================================== */
+
+.sidebar-btn {
+    background: transparent;
+    border: none;
+    color: #FFFFFF;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    padding: 0;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+/* ==========================================================================
+   1.20–1.21 "Add Example" Link
+   ========================================================================== */
+
+.add-example-link {
+    display: block;
+    font-size: 0.8rem;
+    color: #FFFFFF;
+    text-decoration: none;
+    cursor: pointer;
+    padding: 4px 12px 8px 12px;
+    background: transparent;
+    border: none;
+    font-family: 'Roboto', sans-serif;
+}
+
+.add-example-link:hover {
+    text-decoration: underline;
+}
+
+/* ==========================================================================
+   1.22 Edit Pane
+   ========================================================================== */
+
+#edit-pane {
+    flex: 1;
+    background: #FAFAFA;
+    color: #212121;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+/* ==========================================================================
+   1.23–1.26 Edit Pane Field Groups
+   ========================================================================== */
+
+.field-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 1.25rem;
+}
+
+.field-group label {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #424242;
+    margin-bottom: 4px;
+    display: block;
+}
+
+.field-group input[type="text"],
+.field-group textarea {
+    background: #FFFFFF;
+    border: 1px solid #E0E0E0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.95rem;
+    color: #212121;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.field-group input[type="text"]:focus,
+.field-group textarea:focus {
+    border-color: #FF5722;
+}
+
+/* ==========================================================================
+   1.27–1.28 Code Textarea Override
+   ========================================================================== */
+
+.code-textarea {
+    background: #1E1E1E;
+    color: #D4D4D4;
+    border: 1px solid #424242;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    min-height: 300px;
+    white-space: pre;
+    tab-size: 4;
+    resize: vertical;
+}
+
+.code-textarea:focus {
+    border-color: #FF5722;
+}
+
+/* ==========================================================================
+   1.29–1.33 Empty State
+   ========================================================================== */
+
+#empty-state {
+    padding: 1.5rem;
+    background: #FAFAFA;
+    color: #212121;
+    flex: 1;
+}
+
+#empty-state h2 {
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: #212121;
+    margin-bottom: 1.5rem;
+}
+
+#version-input {
+    width: 200px;
+}
+
+/* 1.32 — matches #btn-present sizing; margin-top and display overrides */
+#btn-generate {
+    font-size: 0.95rem;
+    padding: 10px 20px;
+    margin-top: 1rem;
+    display: block;
+}
+
+/* 1.33 */
+#scrape-error {
+    background: #FFEBEE;
+    border: 1px solid #FFCDD2;
+    color: #C62828;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    margin-top: 8px;
+}
+
+/* ==========================================================================
+   1.34–1.35 CSS Spinner
+   ========================================================================== */
+
+.spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #FFFFFF;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   1.36–1.43 Confirmation Modal
+   ========================================================================== */
+
+#modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+#modal-card {
+    background: #FAFAFA;
+    width: 480px;
+    border-radius: 6px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+#modal-title {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #212121;
+    margin-bottom: 0.75rem;
+}
+
+#modal-body {
+    font-size: 0.95rem;
+    color: #424242;
+}
+
+#modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 1.5rem;
+}
+
+#modal-cancel {
+    background: #E0E0E0;
+    color: #212121;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+#modal-cancel:hover {
+    background: #BDBDBD;
+}
+
+#modal-confirm {
+    background: #212121;
+    color: #FFFFFF;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+}
+
+#modal-confirm:hover {
+    background: #424242;
+}

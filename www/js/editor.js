@@ -1,12 +1,16 @@
 /**
- * editor.js — scrape flow and initial editor state management.
+ * editor.js — scrape flow, sidebar, and edit pane.
  *
  * Phase 2 scope:
  *   - On load: check whether a presentation already exists
  *   - Show empty-state (scrape form) or editor chrome accordingly
  *   - Handle the full scrape → confirmation modal → persist → reload cycle
  *
- * Phase 3 will add the sidebar slide list and edit pane details.
+ * Phase 3 additions:
+ *   - loadSlides() fetches GET /api/slides.php and renders the sidebar
+ *   - Sidebar shows each slide with a label, ▲ ▼ ✕ controls
+ *   - Clicking a sidebar item opens the appropriate edit form in the edit pane
+ *   - Edit form fields auto-save on blur via PATCH endpoints
  */
 
 'use strict';
@@ -17,10 +21,17 @@
 let versionInput, btnGenerate, btnGenerateNew;
 let scrapeError, emptyState;
 let sidebar, editPane, headerActions, headerTitle;
-let modalOverlay, modalMessage, modalCancel, modalConfirm;
+let modalOverlay, modalTitle, modalBody, modalCancel, modalConfirm;
 
 // Holds the last successful scrape result while the modal is open.
 let pendingScrapeData = null;
+
+// ---------------------------------------------------------------------------
+// Phase 3: in-memory editor state
+// ---------------------------------------------------------------------------
+let cachedPresentation = null; // Full presentation row from GET /api/presentation.php
+let cachedSlides       = [];   // Ordered array of slide rows from GET /api/slides.php
+let selectedSlideId    = null; // ID of the currently active slide
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -36,7 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
     headerActions   = document.getElementById('header-actions');
     headerTitle     = document.getElementById('header-title');
     modalOverlay    = document.getElementById('modal-overlay');
-    modalMessage    = document.getElementById('modal-message');
+    modalTitle      = document.getElementById('modal-title');
+    modalBody       = document.getElementById('modal-body');
     modalCancel     = document.getElementById('modal-cancel');
     modalConfirm    = document.getElementById('modal-confirm');
 
@@ -61,9 +73,9 @@ async function checkExistingPresentation() {
         if (response.status === 404) {
             showEmptyState();
         } else if (response.ok) {
-            const presentation = await response.json();
-            showEditorChrome(presentation);
-            loadSlides(); // stub — populated in Phase 3
+            cachedPresentation = await response.json();
+            showEditorChrome(cachedPresentation);
+            loadSlides();
         } else {
             // Unexpected error — default to empty state so the user can still generate.
             showEmptyState();
@@ -128,7 +140,8 @@ function showConfirmationModal(data) {
         ? ' This will replace your current presentation.'
         : '';
 
-    modalMessage.textContent =
+    modalTitle.textContent = 'Confirm';
+    modalBody.textContent  =
         `Found ${data.jep_count} JEP${data.jep_count !== 1 ? 's' : ''} for JDK ${data.jdk_version}.`
         + replacementWarning
         + ' Continue?';
@@ -170,7 +183,7 @@ async function handleModalConfirm() {
         const data = await response.json();
 
         if (!response.ok || !data.success) {
-            modalMessage.textContent = data.error || 'Failed to save presentation.';
+            modalBody.textContent = data.error || 'Failed to save presentation.';
             modalConfirm.disabled = false;
             modalCancel.disabled  = false;
             return;
@@ -180,7 +193,7 @@ async function handleModalConfirm() {
         reloadEditorState();
 
     } catch {
-        modalMessage.textContent = 'Could not connect to the server. Please try again.';
+        modalBody.textContent = 'Could not connect to the server. Please try again.';
         modalConfirm.disabled = false;
         modalCancel.disabled  = false;
     }
@@ -191,7 +204,6 @@ async function handleModalConfirm() {
 // ---------------------------------------------------------------------------
 async function reloadEditorState() {
     try {
-        // Phase 3 will add: const [presentationResponse, slidesResponse] = await Promise.all([...])
         const presentationResponse = await fetch('/api/presentation.php');
 
         if (!presentationResponse.ok) {
@@ -200,10 +212,9 @@ async function reloadEditorState() {
             return;
         }
 
-        const presentation = await presentationResponse.json();
-
-        showEditorChrome(presentation);
-        loadSlides(); // stub — populated in Phase 3
+        cachedPresentation = await presentationResponse.json();
+        showEditorChrome(cachedPresentation);
+        loadSlides();
     } catch {
         // Network failure after a successful save — reload to restore a consistent state.
         window.location.reload();
@@ -224,7 +235,7 @@ function showEmptyState() {
 function showEditorChrome(presentation) {
     emptyState.style.display    = 'none';
     sidebar.style.display       = '';
-    // editPane stays hidden until Phase 3 selects a slide
+    // editPane stays hidden until a slide is selected
     headerActions.style.display = '';
     headerTitle.textContent     = `JEP Presenter \u2014 JDK ${presentation.jdk_version}`;
 }
@@ -250,8 +261,335 @@ function hideScrapeError() {
 }
 
 // ---------------------------------------------------------------------------
-// Stub — replaced in Phase 3 (feature-editor-sidebar-and-edit-pane)
+// 2.1 loadSlides — fetch slide list and hand off to the sidebar renderer
 // ---------------------------------------------------------------------------
-function loadSlides() {
-    // Phase 3 will populate the sidebar with the slide list from GET /api/slides.php
+async function loadSlides() {
+    try {
+        const response = await fetch('/api/slides.php');
+        if (!response.ok) return;
+        const data = await response.json();
+        cachedSlides = data.slides || [];
+        renderSidebar(cachedSlides);
+    } catch {
+        // Network errors during slide load are non-fatal; sidebar stays empty.
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 2.2 renderSidebar — build or rebuild the <ul> inside #sidebar
+// ---------------------------------------------------------------------------
+function renderSidebar(slides) {
+    let ul = sidebar.querySelector('ul');
+    if (!ul) {
+        ul = document.createElement('ul');
+        sidebar.appendChild(ul);
+    }
+    ul.innerHTML = '';
+
+    slides.forEach((slide, index) => {
+        const isLast = index === slides.length - 1;
+        const li     = createSidebarItem(slide, isLast);
+        ul.appendChild(li);
+
+        // 2.2.3 — insert "Add Example" affordance after every jep slide
+        if (slide.type === 'jep') {
+            const addRow = document.createElement('div');
+            addRow.className = 'add-example-row';
+
+            const addBtn = document.createElement('button');
+            addBtn.type      = 'button';
+            addBtn.className = 'add-example-link';
+            addBtn.textContent = '+ Add Example';
+            // Click wiring deferred to Phase 4 (slide CRUD)
+
+            addRow.appendChild(addBtn);
+            ul.appendChild(addRow);
+        }
+    });
+
+    // 2.2.4 — re-select the previously active slide, or fall back to the first
+    const targetId = (selectedSlideId !== null && slides.some(s => s.id === selectedSlideId))
+        ? selectedSlideId
+        : (slides[0]?.id ?? null);
+
+    if (targetId !== null) {
+        selectSlide(targetId);
+    }
+}
+
+// Build a single <li class="sidebar-item"> for the given slide.
+function createSidebarItem(slide, isLast) {
+    const li = document.createElement('li');
+    li.className       = 'sidebar-item';
+    li.dataset.slideId = slide.id;
+
+    // 2.3 — label text follows §3.7 rules
+    const label = document.createElement('span');
+    label.className   = 'sidebar-label';
+    label.textContent = getSidebarLabel(slide);
+
+    // ▲ Up button — disabled if this is the title slide or position 1
+    const btnUp = document.createElement('button');
+    btnUp.type      = 'button';
+    btnUp.className = 'sidebar-btn btn-up';
+    btnUp.textContent = '▲';
+    btnUp.setAttribute('aria-label', 'Move slide up');
+    btnUp.disabled = slide.type === 'title' || slide.position === 1;
+
+    // ▼ Down button — disabled if this is the last slide
+    const btnDown = document.createElement('button');
+    btnDown.type      = 'button';
+    btnDown.className = 'sidebar-btn btn-down';
+    btnDown.textContent = '▼';
+    btnDown.setAttribute('aria-label', 'Move slide down');
+    btnDown.disabled = isLast;
+
+    // ✕ Delete button — hidden for the title slide
+    const btnDelete = document.createElement('button');
+    btnDelete.type      = 'button';
+    btnDelete.className = 'sidebar-btn btn-delete';
+    btnDelete.textContent = '✕';
+    btnDelete.setAttribute('aria-label', 'Delete slide');
+    if (slide.type === 'title') {
+        btnDelete.style.display = 'none';
+    }
+
+    // 2.4 — clicking anywhere on the <li> selects the slide
+    li.addEventListener('click', () => selectSlide(slide.id));
+
+    li.appendChild(label);
+    li.appendChild(btnUp);
+    li.appendChild(btnDown);
+    li.appendChild(btnDelete);
+
+    return li;
+}
+
+// ---------------------------------------------------------------------------
+// 2.3 getSidebarLabel — compute the display label for a slide per §3.7
+// ---------------------------------------------------------------------------
+function getSidebarLabel(slide) {
+    if (slide.type === 'title') {
+        return cachedPresentation ? cachedPresentation.title : 'Title Slide';
+    }
+
+    if (slide.type === 'jep') {
+        return `JEP ${slide.jep_number} \u2014 ${slide.jep_title}`;
+    }
+
+    // example type
+    if (slide.slide_title) {
+        return slide.slide_title;
+    }
+    if (slide.code_content) {
+        const snippet = slide.code_content.trim().slice(0, 50);
+        return snippet + '\u2026';
+    }
+    return '(New Example)';
+}
+
+// Update just the label span of one sidebar item — avoids a full re-render.
+function updateSidebarLabel(slideId) {
+    if (slideId === null) return;
+
+    const slide = cachedSlides.find(s => s.id === slideId);
+    if (!slide) return;
+
+    const li = sidebar.querySelector(`[data-slide-id="${slideId}"]`);
+    if (!li) return;
+
+    const labelEl = li.querySelector('.sidebar-label');
+    if (labelEl) {
+        labelEl.textContent = getSidebarLabel(slide);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 3.1 selectSlide — activate a slide and show its edit form
+// ---------------------------------------------------------------------------
+function selectSlide(slideId) {
+    selectedSlideId = slideId;
+
+    // Update active class on sidebar items
+    sidebar.querySelectorAll('.sidebar-item').forEach(item => {
+        const isActive = parseInt(item.dataset.slideId, 10) === slideId;
+        item.classList.toggle('active', isActive);
+    });
+
+    const slide = cachedSlides.find(s => s.id === slideId);
+    if (!slide) return;
+
+    renderEditPane(slide, cachedPresentation);
+    editPane.style.display = '';
+}
+
+// ---------------------------------------------------------------------------
+// 3.2 renderEditPane — dispatch to the correct sub-renderer
+// ---------------------------------------------------------------------------
+function renderEditPane(slide, presentation) {
+    editPane.innerHTML = '';
+
+    if (slide.type === 'title') {
+        renderTitleSlideForm(presentation);
+    } else if (slide.type === 'jep') {
+        renderJepSlideForm(slide);
+    } else if (slide.type === 'example') {
+        renderExampleSlideForm(slide);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 3.3 renderTitleSlideForm — edits the presentation-level metadata
+// ---------------------------------------------------------------------------
+function renderTitleSlideForm(presentation) {
+    const fields = [
+        { id: 'field-pres-title',    label: 'Presentation Title',        key: 'title',        value: presentation?.title        ?? '' },
+        { id: 'field-pres-date',     label: 'Release Date',              key: 'release_date', value: presentation?.release_date ?? '' },
+        { id: 'field-pres-subtitle', label: 'Custom Subtitle / Tagline', key: 'subtitle',     value: presentation?.subtitle     ?? '' },
+    ];
+
+    fields.forEach(({ id, label, key, value }) => {
+        const group = makeInputField(id, label, value);
+        const input = group.querySelector('input');
+
+        // 3.3.2 — auto-save on blur
+        input.addEventListener('blur', async () => {
+            try {
+                const res = await fetch('/api/presentation.php', {
+                    method:  'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ [key]: input.value }),
+                });
+                if (!res.ok) return;
+
+                // 3.3.3 — refresh cached presentation, update header & sidebar label
+                const refreshed = await fetch('/api/presentation.php');
+                if (refreshed.ok) {
+                    cachedPresentation = await refreshed.json();
+                    headerTitle.textContent = `JEP Presenter \u2014 JDK ${cachedPresentation.jdk_version}`;
+                    const titleSlide = cachedSlides.find(s => s.type === 'title');
+                    if (titleSlide) {
+                        updateSidebarLabel(titleSlide.id);
+                    }
+                }
+            } catch {
+                // Auto-save failures are silent; blurring again will retry.
+            }
+        });
+
+        editPane.appendChild(group);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// 3.4 renderJepSlideForm — edits jep_number and jep_title
+// ---------------------------------------------------------------------------
+function renderJepSlideForm(slide) {
+    const fields = [
+        { id: 'field-jep-number', label: 'JEP Number', key: 'jep_number', value: slide.jep_number ?? '' },
+        { id: 'field-jep-title',  label: 'JEP Title',  key: 'jep_title',  value: slide.jep_title  ?? '' },
+    ];
+
+    fields.forEach(({ id, label, key, value }) => {
+        const group = makeInputField(id, label, value);
+        const input = group.querySelector('input');
+
+        // 3.4.2 — auto-save on blur
+        input.addEventListener('blur', async () => {
+            try {
+                const res = await fetch('/api/slides.php', {
+                    method:  'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ id: slide.id, [key]: input.value }),
+                });
+                if (!res.ok) return;
+
+                // 3.4.3 — update in-memory slide and refresh sidebar label
+                slide[key] = input.value;
+                updateSidebarLabel(slide.id);
+            } catch {
+                // silent
+            }
+        });
+
+        editPane.appendChild(group);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// 3.5 renderExampleSlideForm — edits slide_title and code_content
+// ---------------------------------------------------------------------------
+function renderExampleSlideForm(slide) {
+    // 3.5.1 — Slide Title input
+    const titleGroup = makeInputField('field-ex-title', 'Slide Title', slide.slide_title ?? '');
+    const titleInput = titleGroup.querySelector('input');
+
+    titleInput.addEventListener('blur', async () => {
+        await patchSlideField(slide, 'slide_title', titleInput.value);
+    });
+
+    editPane.appendChild(titleGroup);
+
+    // 3.5.1 — Code textarea
+    const codeId    = 'field-ex-code';
+    const codeGroup = document.createElement('div');
+    codeGroup.className = 'field-group';
+
+    const codeLabel = document.createElement('label');
+    codeLabel.htmlFor     = codeId;
+    codeLabel.textContent = 'Code';
+
+    const codeArea = document.createElement('textarea');
+    codeArea.id          = codeId;
+    codeArea.className   = 'code-textarea';
+    codeArea.textContent = slide.code_content ?? '';
+
+    // 3.5.2 — auto-save on blur
+    codeArea.addEventListener('blur', async () => {
+        await patchSlideField(slide, 'code_content', codeArea.value);
+    });
+
+    codeGroup.appendChild(codeLabel);
+    codeGroup.appendChild(codeArea);
+    editPane.appendChild(codeGroup);
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+// PATCH a single slide field; update in-memory state and label on success.
+async function patchSlideField(slide, key, newValue) {
+    try {
+        const res = await fetch('/api/slides.php', {
+            method:  'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ id: slide.id, [key]: newValue }),
+        });
+        if (!res.ok) return;
+
+        slide[key] = newValue;
+        updateSidebarLabel(slide.id);
+    } catch {
+        // silent
+    }
+}
+
+// Build a .field-group containing a <label> and an <input type="text">.
+function makeInputField(id, labelText, value) {
+    const group = document.createElement('div');
+    group.className = 'field-group';
+
+    const label = document.createElement('label');
+    label.htmlFor     = id;
+    label.textContent = labelText;
+
+    const input = document.createElement('input');
+    input.type  = 'text';
+    input.id    = id;
+    input.value = value;
+
+    group.appendChild(label);
+    group.appendChild(input);
+    return group;
 }
