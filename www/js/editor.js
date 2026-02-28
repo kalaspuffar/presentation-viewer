@@ -307,7 +307,7 @@ function renderSidebar(slides) {
             addBtn.type      = 'button';
             addBtn.className = 'add-example-link';
             addBtn.textContent = '+ Add Example';
-            // Click wiring deferred to Phase 4 (slide CRUD)
+            addBtn.addEventListener('click', () => addExampleSlide(slide.id));
 
             addRow.appendChild(addBtn);
             ul.appendChild(addRow);
@@ -360,6 +360,24 @@ function createSidebarItem(slide, isLast) {
     if (slide.type === 'title') {
         btnDelete.style.display = 'none';
     }
+
+    // Wire reorder buttons — stop propagation so the <li> click handler
+    // (which selects the slide) does not also fire.
+    btnUp.addEventListener('click', (e) => {
+        e.stopPropagation();
+        reorderSlide(slide.id, 'up');
+    });
+
+    btnDown.addEventListener('click', (e) => {
+        e.stopPropagation();
+        reorderSlide(slide.id, 'down');
+    });
+
+    // Wire delete button.
+    btnDelete.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteSlide(slide.id);
+    });
 
     // 2.4 — clicking anywhere on the <li> selects the slide
     li.addEventListener('click', () => selectSlide(slide.id));
@@ -572,6 +590,89 @@ function renderExampleSlideForm(slide) {
     codeGroup.appendChild(codeLabel);
     codeGroup.appendChild(codeArea);
     editPane.appendChild(codeGroup);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 CRUD actions
+// ---------------------------------------------------------------------------
+
+// Delete a slide; reload the sidebar and clear the edit pane on success.
+async function deleteSlide(slideId) {
+    try {
+        const res = await fetch('/api/slides.php', {
+            method:  'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ id: slideId }),
+        });
+
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            console.error('Delete failed:', data.error ?? res.status);
+            return;
+        }
+
+        // Clear the selection so the edit pane is hidden after reload.
+        selectedSlideId = null;
+        editPane.style.display = 'none';
+        await loadSlides();
+
+    } catch (err) {
+        console.error('Delete request failed:', err);
+    }
+}
+
+// Add a new example slide beneath the given JEP slide; select it immediately.
+async function addExampleSlide(parentJepId) {
+    try {
+        const res = await fetch('/api/slides.php', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ parent_jep_id: parentJepId }),
+        });
+
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            console.error('Add example failed:', data.error ?? res.status);
+            return;
+        }
+
+        const data    = await res.json();
+        const newSlide = data.slide;
+
+        // Reload the sidebar, then open the new slide in the edit pane.
+        await loadSlides();
+        if (newSlide?.id) {
+            selectSlide(newSlide.id);
+        }
+
+    } catch (err) {
+        console.error('Add example request failed:', err);
+    }
+}
+
+// Move a slide up or down; keep the same slide selected after re-render.
+async function reorderSlide(slideId, direction) {
+    try {
+        const res = await fetch('/api/slides.php?action=reorder', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ id: slideId, direction }),
+        });
+
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            console.error('Reorder failed:', data.error ?? res.status);
+            // Re-render to reflect accurate button state even after a rejection.
+            await loadSlides();
+            return;
+        }
+
+        // loadSlides → renderSidebar preserves selectedSlideId automatically.
+        await loadSlides();
+
+    } catch (err) {
+        console.error('Reorder request failed:', err);
+    }
 }
 
 // ---------------------------------------------------------------------------
