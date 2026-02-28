@@ -35,7 +35,7 @@
 
         <!-- Empty state — shown when no presentation exists -->
         <div id="empty-state">
-            <h1>Generate a Presentation</h1>
+            <h2>Generate a Presentation</h2>
 
             <div class="form-group">
                 <label for="version-input">JDK Version</label>
@@ -56,9 +56,10 @@
     </main>
 
     <!-- Confirmation modal — shown before persisting a scraped presentation -->
-    <div id="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="modal-message">
+    <div id="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div id="modal-card">
-            <p id="modal-message"></p>
+            <p id="modal-title"></p>
+            <p id="modal-body"></p>
             <div id="modal-actions">
                 <button id="modal-cancel" type="button">Cancel</button>
                 <button id="modal-confirm" type="button">Continue</button>
