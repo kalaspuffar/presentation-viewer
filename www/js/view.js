@@ -155,8 +155,8 @@ function buildExampleSlide(slide) {
     code.textContent = slide.code_content || '';
 
     // Apply syntax highlighting when there is code to highlight.
-    // hljs.highlightElement handles language auto-detection.
-    if (slide.code_content) {
+    // Falls back gracefully to plain text if hljs failed to load.
+    if (slide.code_content && typeof hljs !== 'undefined') {
         hljs.highlightElement(code);
     }
 

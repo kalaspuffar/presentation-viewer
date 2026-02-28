@@ -322,13 +322,12 @@ function renderSidebar(slides) {
     slides.forEach((slide, index) => {
         if (slide.type !== 'jep') return;
 
-        // Scan forward to find the last example that belongs to this JEP.
+        // Scan the full remaining list — parent_jep_id is the authoritative
+        // grouping key, so we do not rely on examples being contiguous.
         let insertAfterIndex = index;
         for (let j = index + 1; j < slides.length; j++) {
             if (slides[j].type === 'example' && slides[j].parent_jep_id === slide.id) {
                 insertAfterIndex = j;
-            } else {
-                break;
             }
         }
 
@@ -347,7 +346,7 @@ function renderSidebar(slides) {
 
     slides.forEach((slide, index) => {
         const isLast = index === slides.length - 1;
-        const li     = createSidebarItem(slide, isLast);
+        const li     = createSidebarItem(slide, index, isLast);
         ul.appendChild(li);
 
         // Append the "Add Example" row for any JEP whose insertion point is here.
@@ -367,7 +366,7 @@ function renderSidebar(slides) {
 }
 
 // Build a single <li class="sidebar-item"> for the given slide.
-function createSidebarItem(slide, isLast) {
+function createSidebarItem(slide, slideIndex, isLast) {
     const li = document.createElement('li');
     li.className       = slide.type === 'example'
         ? 'sidebar-item sidebar-item--example-child'
@@ -393,9 +392,8 @@ function createSidebarItem(slide, isLast) {
     if (slide.type === 'title') {
         btnUp.disabled = true;
     } else if (slide.type === 'example') {
-        const slideIndex  = cachedSlides.findIndex(s => s.id === slide.id);
-        const above       = slideIndex > 0 ? cachedSlides[slideIndex - 1] : null;
-        btnUp.disabled    = !above || above.type !== 'example' || above.parent_jep_id !== slide.parent_jep_id;
+        const above    = slideIndex > 0 ? cachedSlides[slideIndex - 1] : null;
+        btnUp.disabled = !above || above.type !== 'example' || above.parent_jep_id !== slide.parent_jep_id;
     } else {
         // jep slides — preserve original guard against displacing the title
         btnUp.disabled = slide.position <= 2;
@@ -412,7 +410,6 @@ function createSidebarItem(slide, isLast) {
     btnDown.setAttribute('aria-label', 'Move slide down');
 
     if (slide.type === 'example') {
-        const slideIndex  = cachedSlides.findIndex(s => s.id === slide.id);
         const below       = slideIndex < cachedSlides.length - 1 ? cachedSlides[slideIndex + 1] : null;
         btnDown.disabled  = !below || below.type !== 'example' || below.parent_jep_id !== slide.parent_jep_id;
     } else {
