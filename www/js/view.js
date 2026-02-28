@@ -2,10 +2,12 @@
 
 // ---------------------------------------------------------------------------
 // Initialisation — fetch presentation + slides in parallel, then build slides
+// `defer` on the <script> tag guarantees the DOM is ready; no DOMContentLoaded needed
 // ---------------------------------------------------------------------------
-document.addEventListener('DOMContentLoaded', async () => {
-    const slideContainer = document.getElementById('slide-container');
 
+const slideContainer = document.getElementById('slide-container');
+
+(async () => {
     try {
         // 3.1 Fire two parallel fetches
         const [presResponse, slidesResponse] = await Promise.all([
@@ -23,8 +25,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         buildSlides(presentation, slides, slideContainer);
 
-    } catch {
-        // 3.3 Minimal error message on fetch failure
+        // 3.3b Guard against an empty presentation
+        if (slides.length === 0) {
+            slideContainer.textContent = 'No slides found. Return to the editor and generate a presentation.';
+            return;
+        }
+
+    } catch (err) {
+        // 3.3 Log the underlying cause before surfacing the user-facing message
+        console.error('[view.js] Failed to load presentation data:', err);
         slideContainer.textContent = 'Could not load presentation. Please try again.';
         return;
     }
@@ -43,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             27: () => { window.location.href = 'editor.php'; },
         },
     });
-});
+})();
 
 // ---------------------------------------------------------------------------
 // 3.4 buildSlides — iterate slides and append <section> elements to the container
@@ -108,7 +117,8 @@ function buildJepSlide(slide) {
 
     const label = document.createElement('div');
     label.className   = 'jep-label';
-    label.textContent = `JEP ${slide.jep_number}`;
+    // Guard against a null/undefined jep_number to avoid rendering "JEP null"
+    label.textContent = slide.jep_number != null ? `JEP ${slide.jep_number}` : 'JEP ???';
 
     const title = document.createElement('p');
     title.className   = 'jep-title';
