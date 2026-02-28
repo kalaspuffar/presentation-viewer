@@ -35,11 +35,13 @@ class SlideRepository
 
     public function create(int $presentationId, int $parentJepId): array
     {
-        // Fetch the parent JEP slide to get its jep_number and position.
+        // Fetch the parent JEP slide, scoped to this presentation, to get its
+        // jep_number and position.  The presentation_id check ensures a caller
+        // cannot reference a parent slide from a different presentation.
         $parentStmt = $this->pdo->prepare(
-            'SELECT * FROM slides WHERE id = :parentJepId'
+            'SELECT * FROM slides WHERE id = :parentJepId AND presentation_id = :presentationId'
         );
-        $parentStmt->execute([':parentJepId' => $parentJepId]);
+        $parentStmt->execute([':parentJepId' => $parentJepId, ':presentationId' => $presentationId]);
         $parentSlide = $parentStmt->fetch();
 
         if (!$parentSlide) {
@@ -127,6 +129,10 @@ class SlideRepository
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
+
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException('Slide not found.', 404);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -214,6 +220,11 @@ class SlideRepository
 
         if (!$neighbour) {
             throw new RuntimeException('No neighbour slide to swap with.', 400);
+        }
+
+        // Prevent any swap that would displace the title slide from position 1.
+        if ($neighbour['type'] === 'title') {
+            throw new RuntimeException('Cannot move a slide above the title slide.', 400);
         }
 
         // Swap positions using a temporary value (0) to avoid the unique index

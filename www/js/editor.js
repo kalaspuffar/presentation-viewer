@@ -267,6 +267,27 @@ function hideScrapeError() {
     scrapeError.style.display = 'none';
 }
 
+// Transient error banner shown inside the sidebar for slide CRUD failures.
+function showOperationError(message) {
+    let banner = sidebar.querySelector('.sidebar-error');
+    if (!banner) {
+        banner = document.createElement('p');
+        banner.className = 'sidebar-error';
+        banner.setAttribute('role', 'alert');
+        banner.setAttribute('aria-live', 'polite');
+        sidebar.prepend(banner);
+    }
+    banner.textContent   = message;
+    banner.style.display = '';
+}
+
+function hideOperationError() {
+    const banner = sidebar.querySelector('.sidebar-error');
+    if (banner) {
+        banner.style.display = 'none';
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 2.1 loadSlides — fetch slide list and hand off to the sidebar renderer
 // ---------------------------------------------------------------------------
@@ -335,13 +356,15 @@ function createSidebarItem(slide, isLast) {
     label.className   = 'sidebar-label';
     label.textContent = getSidebarLabel(slide);
 
-    // ▲ Up button — disabled if this is the title slide or position 1
+    // ▲ Up button — disabled for the title slide (position 1) and the slide
+    // immediately below it (position 2), because moving position-2 up would
+    // swap it with the title slide and displace the title from position 1.
     const btnUp = document.createElement('button');
     btnUp.type      = 'button';
     btnUp.className = 'sidebar-btn btn-up';
     btnUp.textContent = '▲';
     btnUp.setAttribute('aria-label', 'Move slide up');
-    btnUp.disabled = slide.type === 'title' || slide.position === 1;
+    btnUp.disabled = slide.type === 'title' || slide.position <= 2;
 
     // ▼ Down button — disabled if this is the last slide
     const btnDown = document.createElement('button');
@@ -474,13 +497,16 @@ function renderTitleSlideForm(presentation) {
     ];
 
     fields.forEach(({ id, label, key, value }) => {
-        const group         = makeInputField(id, label, value);
-        const input         = group.querySelector('input');
-        const originalValue = value; // capture at render time to skip no-op saves
+        const group   = makeInputField(id, label, value);
+        const input   = group.querySelector('input');
+        // lastSaved tracks the most recently confirmed server value so that a
+        // failed save does not reset the change-detection baseline, allowing
+        // the user to blur again and trigger a retry.
+        let lastSaved = value;
 
         // 3.3.2 — auto-save on blur
         input.addEventListener('blur', async () => {
-            if (input.value === originalValue) return; // nothing changed
+            if (input.value === lastSaved) return; // nothing changed
 
             try {
                 const res = await fetch('/api/presentation.php', {
@@ -489,6 +515,9 @@ function renderTitleSlideForm(presentation) {
                     body:    JSON.stringify({ [key]: input.value }),
                 });
                 if (!res.ok) return;
+
+                // Advance baseline only after a confirmed save.
+                lastSaved = input.value;
 
                 // 3.3.3 — refresh cached presentation, update header & sidebar label
                 const refreshed = await fetch('/api/presentation.php');
@@ -519,13 +548,15 @@ function renderJepSlideForm(slide) {
     ];
 
     fields.forEach(({ id, label, key, value }) => {
-        const group         = makeInputField(id, label, value);
-        const input         = group.querySelector('input');
-        const originalValue = value; // capture at render time to skip no-op saves
+        const group   = makeInputField(id, label, value);
+        const input   = group.querySelector('input');
+        // lastSaved tracks the most recently confirmed server value so that a
+        // failed save does not reset the change-detection baseline.
+        let lastSaved = value;
 
         // 3.4.2 — auto-save on blur
         input.addEventListener('blur', async () => {
-            if (input.value === originalValue) return; // nothing changed
+            if (input.value === lastSaved) return; // nothing changed
 
             // jep_number must be a positive integer; reject non-numeric input silently.
             if (key === 'jep_number' && !/^\d+$/.test(input.value)) return;
@@ -537,6 +568,9 @@ function renderJepSlideForm(slide) {
                     body:    JSON.stringify({ id: slide.id, [key]: input.value }),
                 });
                 if (!res.ok) return;
+
+                // Advance baseline only after a confirmed save.
+                lastSaved  = input.value;
 
                 // 3.4.3 — update in-memory slide and refresh sidebar label
                 slide[key] = input.value;
@@ -555,21 +589,26 @@ function renderJepSlideForm(slide) {
 // ---------------------------------------------------------------------------
 function renderExampleSlideForm(slide) {
     // 3.5.1 — Slide Title input
-    const originalTitleValue = slide.slide_title ?? '';
-    const titleGroup = makeInputField('field-ex-title', 'Slide Title', originalTitleValue);
-    const titleInput = titleGroup.querySelector('input');
+    // lastSavedTitle tracks the most recently confirmed server value so that a
+    // failed save does not reset the change-detection baseline.
+    let lastSavedTitle = slide.slide_title ?? '';
+    const titleGroup   = makeInputField('field-ex-title', 'Slide Title', lastSavedTitle);
+    const titleInput   = titleGroup.querySelector('input');
 
     titleInput.addEventListener('blur', async () => {
-        if (titleInput.value === originalTitleValue) return; // nothing changed
-        await patchSlideField(slide, 'slide_title', titleInput.value);
+        if (titleInput.value === lastSavedTitle) return; // nothing changed
+        const saved = await patchSlideField(slide, 'slide_title', titleInput.value);
+        if (saved) lastSavedTitle = titleInput.value;
     });
 
     editPane.appendChild(titleGroup);
 
     // 3.5.2 — Code textarea
-    const originalCodeValue = slide.code_content ?? '';
-    const codeId    = 'field-ex-code';
-    const codeGroup = document.createElement('div');
+    // lastSavedCode tracks the most recently confirmed server value so that a
+    // failed save does not reset the change-detection baseline.
+    let lastSavedCode = slide.code_content ?? '';
+    const codeId      = 'field-ex-code';
+    const codeGroup   = document.createElement('div');
     codeGroup.className = 'field-group';
 
     const codeLabel = document.createElement('label');
@@ -579,12 +618,13 @@ function renderExampleSlideForm(slide) {
     const codeArea = document.createElement('textarea');
     codeArea.id        = codeId;
     codeArea.className = 'code-textarea';
-    codeArea.value     = originalCodeValue;
+    codeArea.value     = lastSavedCode;
 
     // 3.5.2 — auto-save on blur
     codeArea.addEventListener('blur', async () => {
-        if (codeArea.value === originalCodeValue) return; // nothing changed
-        await patchSlideField(slide, 'code_content', codeArea.value);
+        if (codeArea.value === lastSavedCode) return; // nothing changed
+        const saved = await patchSlideField(slide, 'code_content', codeArea.value);
+        if (saved) lastSavedCode = codeArea.value;
     });
 
     codeGroup.appendChild(codeLabel);
@@ -598,6 +638,7 @@ function renderExampleSlideForm(slide) {
 
 // Delete a slide; reload the sidebar and clear the edit pane on success.
 async function deleteSlide(slideId) {
+    hideOperationError();
     try {
         const res = await fetch('/api/slides.php', {
             method:  'DELETE',
@@ -607,22 +648,22 @@ async function deleteSlide(slideId) {
 
         if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            console.error('Delete failed:', data.error ?? res.status);
+            showOperationError(data.error ?? 'Could not delete slide. Please try again.');
             return;
         }
 
-        // Clear the selection so the edit pane is hidden after reload.
+        // Clear the selection; renderSidebar will auto-select the title slide.
         selectedSlideId = null;
-        editPane.style.display = 'none';
         await loadSlides();
 
-    } catch (err) {
-        console.error('Delete request failed:', err);
+    } catch {
+        showOperationError('Could not connect to the server. Please try again.');
     }
 }
 
 // Add a new example slide beneath the given JEP slide; select it immediately.
 async function addExampleSlide(parentJepId) {
+    hideOperationError();
     try {
         const res = await fetch('/api/slides.php', {
             method:  'POST',
@@ -632,11 +673,11 @@ async function addExampleSlide(parentJepId) {
 
         if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            console.error('Add example failed:', data.error ?? res.status);
+            showOperationError(data.error ?? 'Could not add example slide. Please try again.');
             return;
         }
 
-        const data    = await res.json();
+        const data     = await res.json();
         const newSlide = data.slide;
 
         // Reload the sidebar, then open the new slide in the edit pane.
@@ -645,13 +686,14 @@ async function addExampleSlide(parentJepId) {
             selectSlide(newSlide.id);
         }
 
-    } catch (err) {
-        console.error('Add example request failed:', err);
+    } catch {
+        showOperationError('Could not connect to the server. Please try again.');
     }
 }
 
 // Move a slide up or down; keep the same slide selected after re-render.
 async function reorderSlide(slideId, direction) {
+    hideOperationError();
     try {
         const res = await fetch('/api/slides.php?action=reorder', {
             method:  'POST',
@@ -661,7 +703,7 @@ async function reorderSlide(slideId, direction) {
 
         if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            console.error('Reorder failed:', data.error ?? res.status);
+            showOperationError(data.error ?? 'Could not reorder slide. Please try again.');
             // Re-render to reflect accurate button state even after a rejection.
             await loadSlides();
             return;
@@ -670,8 +712,8 @@ async function reorderSlide(slideId, direction) {
         // loadSlides → renderSidebar preserves selectedSlideId automatically.
         await loadSlides();
 
-    } catch (err) {
-        console.error('Reorder request failed:', err);
+    } catch {
+        showOperationError('Could not connect to the server. Please try again.');
     }
 }
 
@@ -680,6 +722,8 @@ async function reorderSlide(slideId, direction) {
 // ---------------------------------------------------------------------------
 
 // PATCH a single slide field; update in-memory state and label on success.
+// Returns true when the server confirmed the save, false otherwise — so
+// callers can advance their own lastSaved baseline only on confirmed writes.
 async function patchSlideField(slide, key, newValue) {
     try {
         const res = await fetch('/api/slides.php', {
@@ -687,12 +731,14 @@ async function patchSlideField(slide, key, newValue) {
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ id: slide.id, [key]: newValue }),
         });
-        if (!res.ok) return;
+        if (!res.ok) return false;
 
         slide[key] = newValue;
         updateSidebarLabel(slide.id);
+        return true;
     } catch (err) {
         console.warn('Auto-save failed for slide field:', key, err);
+        return false;
     }
 }
 
