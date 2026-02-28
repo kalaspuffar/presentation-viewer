@@ -58,8 +58,8 @@
     <!-- Confirmation modal — shown before persisting a scraped presentation -->
     <div id="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div id="modal-card">
-            <p id="modal-title"></p>
-            <p id="modal-body"></p>
+            <h2 id="modal-title"></h2>
+            <p  id="modal-body"></p>
             <div id="modal-actions">
                 <button id="modal-cancel" type="button">Cancel</button>
                 <button id="modal-confirm" type="button">Continue</button>

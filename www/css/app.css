@@ -148,6 +148,16 @@ body {
     text-overflow: ellipsis;
 }
 
+/* Transient error banner prepended inside the sidebar for CRUD failures. */
+.sidebar-error {
+    margin: 0;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.35);
+    color: #FFCCBC;
+    font-size: 0.85rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
 /* ==========================================================================
    1.17–1.19 Sidebar Micro-controls (▲ ▼ ✕)
    ========================================================================== */
@@ -244,6 +254,18 @@ body {
 .field-group input[type="text"]:focus,
 .field-group textarea:focus {
     border-color: #FF5722;
+}
+
+/* Inline field validation error — shown beneath an invalid input. */
+.field-error {
+    display: block;
+    color: #C62828;
+    font-size: 0.8rem;
+    margin-top: 4px;
+}
+
+.field-group input[aria-invalid="true"] {
+    border-color: #C62828;
 }
 
 /* ==========================================================================
