@@ -204,17 +204,24 @@ async function handleModalConfirm() {
 // ---------------------------------------------------------------------------
 async function reloadEditorState() {
     try {
-        const presentationResponse = await fetch('/api/presentation.php');
+        // Fetch presentation metadata and slides in parallel.
+        const [presResponse, slidesResponse] = await Promise.all([
+            fetch('/api/presentation.php'),
+            fetch('/api/slides.php'),
+        ]);
 
-        if (!presentationResponse.ok) {
+        if (!presResponse.ok) {
             // Presentation was saved but re-fetch failed; a page reload will recover.
             window.location.reload();
             return;
         }
 
-        cachedPresentation = await presentationResponse.json();
+        cachedPresentation = await presResponse.json();
+        const slidesData   = slidesResponse.ok ? await slidesResponse.json() : { slides: [] };
+        cachedSlides       = slidesData.slides || [];
+
         showEditorChrome(cachedPresentation);
-        loadSlides();
+        renderSidebar(cachedSlides);
     } catch {
         // Network failure after a successful save — reload to restore a consistent state.
         window.location.reload();
@@ -293,7 +300,7 @@ function renderSidebar(slides) {
 
         // 2.2.3 — insert "Add Example" affordance after every jep slide
         if (slide.type === 'jep') {
-            const addRow = document.createElement('div');
+            const addRow = document.createElement('li');
             addRow.className = 'add-example-row';
 
             const addBtn = document.createElement('button');
@@ -449,11 +456,14 @@ function renderTitleSlideForm(presentation) {
     ];
 
     fields.forEach(({ id, label, key, value }) => {
-        const group = makeInputField(id, label, value);
-        const input = group.querySelector('input');
+        const group         = makeInputField(id, label, value);
+        const input         = group.querySelector('input');
+        const originalValue = value; // capture at render time to skip no-op saves
 
         // 3.3.2 — auto-save on blur
         input.addEventListener('blur', async () => {
+            if (input.value === originalValue) return; // nothing changed
+
             try {
                 const res = await fetch('/api/presentation.php', {
                     method:  'PATCH',
@@ -472,8 +482,8 @@ function renderTitleSlideForm(presentation) {
                         updateSidebarLabel(titleSlide.id);
                     }
                 }
-            } catch {
-                // Auto-save failures are silent; blurring again will retry.
+            } catch (err) {
+                console.warn('Auto-save failed for presentation field:', key, err);
             }
         });
 
@@ -491,11 +501,17 @@ function renderJepSlideForm(slide) {
     ];
 
     fields.forEach(({ id, label, key, value }) => {
-        const group = makeInputField(id, label, value);
-        const input = group.querySelector('input');
+        const group         = makeInputField(id, label, value);
+        const input         = group.querySelector('input');
+        const originalValue = value; // capture at render time to skip no-op saves
 
         // 3.4.2 — auto-save on blur
         input.addEventListener('blur', async () => {
+            if (input.value === originalValue) return; // nothing changed
+
+            // jep_number must be a positive integer; reject non-numeric input silently.
+            if (key === 'jep_number' && !/^\d+$/.test(input.value)) return;
+
             try {
                 const res = await fetch('/api/slides.php', {
                     method:  'PATCH',
@@ -507,8 +523,8 @@ function renderJepSlideForm(slide) {
                 // 3.4.3 — update in-memory slide and refresh sidebar label
                 slide[key] = input.value;
                 updateSidebarLabel(slide.id);
-            } catch {
-                // silent
+            } catch (err) {
+                console.warn('Auto-save failed for JEP field:', key, err);
             }
         });
 
@@ -521,16 +537,19 @@ function renderJepSlideForm(slide) {
 // ---------------------------------------------------------------------------
 function renderExampleSlideForm(slide) {
     // 3.5.1 — Slide Title input
-    const titleGroup = makeInputField('field-ex-title', 'Slide Title', slide.slide_title ?? '');
+    const originalTitleValue = slide.slide_title ?? '';
+    const titleGroup = makeInputField('field-ex-title', 'Slide Title', originalTitleValue);
     const titleInput = titleGroup.querySelector('input');
 
     titleInput.addEventListener('blur', async () => {
+        if (titleInput.value === originalTitleValue) return; // nothing changed
         await patchSlideField(slide, 'slide_title', titleInput.value);
     });
 
     editPane.appendChild(titleGroup);
 
-    // 3.5.1 — Code textarea
+    // 3.5.2 — Code textarea
+    const originalCodeValue = slide.code_content ?? '';
     const codeId    = 'field-ex-code';
     const codeGroup = document.createElement('div');
     codeGroup.className = 'field-group';
@@ -540,12 +559,13 @@ function renderExampleSlideForm(slide) {
     codeLabel.textContent = 'Code';
 
     const codeArea = document.createElement('textarea');
-    codeArea.id          = codeId;
-    codeArea.className   = 'code-textarea';
-    codeArea.textContent = slide.code_content ?? '';
+    codeArea.id        = codeId;
+    codeArea.className = 'code-textarea';
+    codeArea.value     = originalCodeValue;
 
     // 3.5.2 — auto-save on blur
     codeArea.addEventListener('blur', async () => {
+        if (codeArea.value === originalCodeValue) return; // nothing changed
         await patchSlideField(slide, 'code_content', codeArea.value);
     });
 
@@ -570,8 +590,8 @@ async function patchSlideField(slide, key, newValue) {
 
         slide[key] = newValue;
         updateSidebarLabel(slide.id);
-    } catch {
-        // silent
+    } catch (err) {
+        console.warn('Auto-save failed for slide field:', key, err);
     }
 }
 
