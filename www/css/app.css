@@ -256,6 +256,18 @@ body {
     border-color: #FF5722;
 }
 
+/* Inline field validation error — shown beneath an invalid input. */
+.field-error {
+    display: block;
+    color: #C62828;
+    font-size: 0.8rem;
+    margin-top: 4px;
+}
+
+.field-group input[aria-invalid="true"] {
+    border-color: #C62828;
+}
+
 /* ==========================================================================
    1.27–1.28 Code Textarea Override
    ========================================================================== */

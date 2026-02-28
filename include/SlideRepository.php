@@ -64,9 +64,17 @@ class SlideRepository
         $this->pdo->beginTransaction();
         try {
             // Shift every slide at or after the insertion position down by one.
+            //
+            // SQLite checks UNIQUE constraints after each individual row update,
+            // not after the full statement.  A plain +1 update therefore fails
+            // as soon as the first row collides with its still-unshifted
+            // neighbour.  We work around this with a two-step approach that
+            // mirrors the temp-zero trick used in reorder():
+            //   1. Move affected rows to unique negative positions.
+            //   2. Negate them back to their final (shifted) values.
             $shiftStmt = $this->pdo->prepare(
                 'UPDATE slides
-                    SET position = position + 1
+                    SET position = -(position + 1)
                   WHERE position >= :insertionPosition
                     AND presentation_id = :presentationId'
             );
@@ -74,6 +82,14 @@ class SlideRepository
                 ':insertionPosition' => $insertionPosition,
                 ':presentationId'    => $presentationId,
             ]);
+
+            $shiftFinalStmt = $this->pdo->prepare(
+                'UPDATE slides
+                    SET position = -position
+                  WHERE position < 0
+                    AND presentation_id = :presentationId'
+            );
+            $shiftFinalStmt->execute([':presentationId' => $presentationId]);
 
             // Insert the new example slide.
             $insertStmt = $this->pdo->prepare(
@@ -162,9 +178,14 @@ class SlideRepository
             $deleteStmt->execute([':id' => $id]);
 
             // Close the gap by shifting all slides after the deleted one up by one.
+            //
+            // Same two-step negation pattern as in create(): SQLite checks
+            // UNIQUE constraints row-by-row, so a plain -1 update would fail
+            // when two adjacent rows are shifted and the first move collides
+            // with a row that hasn't been updated yet.
             $resequenceStmt = $this->pdo->prepare(
                 'UPDATE slides
-                    SET position = position - 1
+                    SET position = -(position - 1)
                   WHERE position > :deletedPosition
                     AND presentation_id = :presentationId'
             );
@@ -172,6 +193,14 @@ class SlideRepository
                 ':deletedPosition' => $deletedPosition,
                 ':presentationId'  => $presentationId,
             ]);
+
+            $resequenceFinalStmt = $this->pdo->prepare(
+                'UPDATE slides
+                    SET position = -position
+                  WHERE position < 0
+                    AND presentation_id = :presentationId'
+            );
+            $resequenceFinalStmt->execute([':presentationId' => $presentationId]);
 
             $this->pdo->commit();
         } catch (Throwable $e) {

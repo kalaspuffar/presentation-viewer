@@ -556,10 +556,19 @@ function renderJepSlideForm(slide) {
 
         // 3.4.2 — auto-save on blur
         input.addEventListener('blur', async () => {
-            if (input.value === lastSaved) return; // nothing changed
+            if (input.value === lastSaved) {
+                clearFieldError(input);
+                return; // nothing changed
+            }
 
-            // jep_number must be a positive integer; reject non-numeric input silently.
-            if (key === 'jep_number' && !/^\d+$/.test(input.value)) return;
+            // jep_number must be a positive integer; show a field-level error
+            // rather than discarding the input silently.
+            if (key === 'jep_number' && !/^\d+$/.test(input.value)) {
+                setFieldError(input, 'JEP number must be a positive whole number.');
+                return;
+            }
+
+            clearFieldError(input);
 
             try {
                 const res = await fetch('/api/slides.php', {
@@ -740,6 +749,23 @@ async function patchSlideField(slide, key, newValue) {
         console.warn('Auto-save failed for slide field:', key, err);
         return false;
     }
+}
+
+// Show an inline validation error beneath an input and mark it as invalid.
+function setFieldError(input, message) {
+    clearFieldError(input);
+    const err = document.createElement('span');
+    err.className   = 'field-error';
+    err.textContent = message;
+    input.setAttribute('aria-invalid', 'true');
+    input.insertAdjacentElement('afterend', err);
+}
+
+// Remove any inline validation error previously set on an input.
+function clearFieldError(input) {
+    const existing = input.parentElement?.querySelector('.field-error');
+    if (existing) existing.remove();
+    input.removeAttribute('aria-invalid');
 }
 
 // Build a .field-group containing a <label> and an <input type="text">.
