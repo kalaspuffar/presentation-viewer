@@ -41,6 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
     modalConfirm    = document.getElementById('modal-confirm');
 
     btnGenerate.addEventListener('click', generatePresentation);
+    versionInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') generatePresentation();
+    });
     btnGenerateNew.addEventListener('click', showScrapeForm);
     modalCancel.addEventListener('click', handleModalCancel);
     modalConfirm.addEventListener('click', handleModalConfirm);
@@ -188,12 +191,12 @@ async function handleModalConfirm() {
 // ---------------------------------------------------------------------------
 async function reloadEditorState() {
     try {
-        const [presentationResponse] = await Promise.all([
-            fetch('/api/presentation.php'),
-            fetch('/api/slides.php'),  // pre-fetched; used by Phase 3 loadSlides()
-        ]);
+        // Phase 3 will add: const [presentationResponse, slidesResponse] = await Promise.all([...])
+        const presentationResponse = await fetch('/api/presentation.php');
 
         if (!presentationResponse.ok) {
+            // Presentation was saved but re-fetch failed; a page reload will recover.
+            window.location.reload();
             return;
         }
 
@@ -202,7 +205,8 @@ async function reloadEditorState() {
         showEditorChrome(presentation);
         loadSlides(); // stub — populated in Phase 3
     } catch {
-        // Silently fail — the page is still usable.
+        // Network failure after a successful save — reload to restore a consistent state.
+        window.location.reload();
     }
 }
 
@@ -220,7 +224,7 @@ function showEmptyState() {
 function showEditorChrome(presentation) {
     emptyState.style.display    = 'none';
     sidebar.style.display       = '';
-    editPane.style.display      = '';
+    // editPane stays hidden until Phase 3 selects a slide
     headerActions.style.display = '';
     headerTitle.textContent     = `JEP Presenter \u2014 JDK ${presentation.jdk_version}`;
 }

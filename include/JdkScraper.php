@@ -71,6 +71,7 @@ class JdkScraper
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_ENCODING       => '',  // accept any supported encoding; cURL decompresses automatically
             CURLOPT_USERAGENT      => 'JEP-Presenter/1.0 (+https://github.com/)',
         ]);
 
@@ -137,7 +138,7 @@ class JdkScraper
     {
         // Match "JEP 123: Title" or "JEP 123 — Title" (em-dash variant)
         $pattern = '/^JEP\s+' . preg_quote($number, '/') . '\s*[:\x{2014}-]\s*/u';
-        $stripped = preg_replace($pattern, '', $text);
+        $stripped = preg_replace($pattern, '', $text) ?? $text;
 
         // If the whole text was just the number, return empty string.
         if ($stripped === $number) {

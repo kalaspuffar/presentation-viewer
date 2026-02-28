@@ -96,6 +96,12 @@ switch ($method) {
     case 'PATCH':
         $body = json_decode(file_get_contents('php://input'), true);
 
+        if (!is_array($body)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid or empty JSON body.']);
+            exit;
+        }
+
         // Only these fields may be updated via PATCH.
         $allowed = ['title', 'subtitle', 'release_date'];
         $setClauses = [];
@@ -117,6 +123,12 @@ switch ($method) {
         $sql = 'UPDATE presentation SET ' . implode(', ', $setClauses) . ' WHERE id = 1';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
+
+        if ($stmt->rowCount() === 0) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'No presentation to update.']);
+            exit;
+        }
 
         http_response_code(200);
         echo json_encode(['success' => true]);
