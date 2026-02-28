@@ -314,24 +314,45 @@ function renderSidebar(slides) {
     }
     ul.innerHTML = '';
 
+    // 2.2.3 — Pre-compute where each JEP's "Add Example" row should be
+    // inserted.  Each JEP's row goes after its last contiguous example child
+    // rather than immediately after the JEP item itself.
+    // Key: slide index after which the row is appended. Value: the row <li>.
+    const addExampleRows = new Map();
+    slides.forEach((slide, index) => {
+        if (slide.type !== 'jep') return;
+
+        // Scan forward to find the last example that belongs to this JEP.
+        let insertAfterIndex = index;
+        for (let j = index + 1; j < slides.length; j++) {
+            if (slides[j].type === 'example' && slides[j].parent_jep_id === slide.id) {
+                insertAfterIndex = j;
+            } else {
+                break;
+            }
+        }
+
+        const addRow = document.createElement('li');
+        addRow.className = 'add-example-row';
+
+        const addBtn = document.createElement('button');
+        addBtn.type        = 'button';
+        addBtn.className   = 'add-example-link';
+        addBtn.textContent = '+ Add Example';
+        addBtn.addEventListener('click', () => addExampleSlide(slide.id));
+
+        addRow.appendChild(addBtn);
+        addExampleRows.set(insertAfterIndex, addRow);
+    });
+
     slides.forEach((slide, index) => {
         const isLast = index === slides.length - 1;
         const li     = createSidebarItem(slide, isLast);
         ul.appendChild(li);
 
-        // 2.2.3 — insert "Add Example" affordance after every jep slide
-        if (slide.type === 'jep') {
-            const addRow = document.createElement('li');
-            addRow.className = 'add-example-row';
-
-            const addBtn = document.createElement('button');
-            addBtn.type      = 'button';
-            addBtn.className = 'add-example-link';
-            addBtn.textContent = '+ Add Example';
-            addBtn.addEventListener('click', () => addExampleSlide(slide.id));
-
-            addRow.appendChild(addBtn);
-            ul.appendChild(addRow);
+        // Append the "Add Example" row for any JEP whose insertion point is here.
+        if (addExampleRows.has(index)) {
+            ul.appendChild(addExampleRows.get(index));
         }
     });
 
@@ -348,7 +369,9 @@ function renderSidebar(slides) {
 // Build a single <li class="sidebar-item"> for the given slide.
 function createSidebarItem(slide, isLast) {
     const li = document.createElement('li');
-    li.className       = 'sidebar-item';
+    li.className       = slide.type === 'example'
+        ? 'sidebar-item sidebar-item--example-child'
+        : 'sidebar-item';
     li.dataset.slideId = slide.id;
 
     // 2.3 — label text follows §3.7 rules
@@ -356,23 +379,45 @@ function createSidebarItem(slide, isLast) {
     label.className   = 'sidebar-label';
     label.textContent = getSidebarLabel(slide);
 
-    // ▲ Up button — disabled for the title slide (position 1) and the slide
-    // immediately below it (position 2), because moving position-2 up would
-    // swap it with the title slide and displace the title from position 1.
+    // ▲ Up button
+    // — title slides: always disabled
+    // — example slides: disabled when the slide above is not an example of the
+    //   same JEP (i.e. the example is already first in its group)
+    // — jep slides: disabled if moving up would displace the title (position ≤ 2)
     const btnUp = document.createElement('button');
     btnUp.type      = 'button';
     btnUp.className = 'sidebar-btn btn-up';
     btnUp.textContent = '▲';
     btnUp.setAttribute('aria-label', 'Move slide up');
-    btnUp.disabled = slide.type === 'title' || slide.position <= 2;
 
-    // ▼ Down button — disabled if this is the last slide
+    if (slide.type === 'title') {
+        btnUp.disabled = true;
+    } else if (slide.type === 'example') {
+        const slideIndex  = cachedSlides.findIndex(s => s.id === slide.id);
+        const above       = slideIndex > 0 ? cachedSlides[slideIndex - 1] : null;
+        btnUp.disabled    = !above || above.type !== 'example' || above.parent_jep_id !== slide.parent_jep_id;
+    } else {
+        // jep slides — preserve original guard against displacing the title
+        btnUp.disabled = slide.position <= 2;
+    }
+
+    // ▼ Down button
+    // — example slides: disabled when the slide below is not an example of the
+    //   same JEP (i.e. the example is already last in its group)
+    // — all other slides: disabled if this is the last slide
     const btnDown = document.createElement('button');
     btnDown.type      = 'button';
     btnDown.className = 'sidebar-btn btn-down';
     btnDown.textContent = '▼';
     btnDown.setAttribute('aria-label', 'Move slide down');
-    btnDown.disabled = isLast;
+
+    if (slide.type === 'example') {
+        const slideIndex  = cachedSlides.findIndex(s => s.id === slide.id);
+        const below       = slideIndex < cachedSlides.length - 1 ? cachedSlides[slideIndex + 1] : null;
+        btnDown.disabled  = !below || below.type !== 'example' || below.parent_jep_id !== slide.parent_jep_id;
+    } else {
+        btnDown.disabled = isLast;
+    }
 
     // ✕ Delete button — hidden for the title slide
     const btnDelete = document.createElement('button');

@@ -14,6 +14,9 @@
     <!-- Vendored Reveal.js CSS — offline-capable -->
     <link rel="stylesheet" href="/css/vendor/reveal.min.css">
 
+    <!-- Vendored highlight.js theme — offline-capable -->
+    <link rel="stylesheet" href="/css/vendor/highlight.min.css">
+
     <link rel="stylesheet" href="/css/app.css">
 
     <!--
@@ -32,6 +35,9 @@
 
     <!-- Vendored Reveal.js JS — offline-capable -->
     <script src="/js/vendor/reveal.js"></script>
+
+    <!-- Vendored highlight.js — offline-capable -->
+    <script src="/js/vendor/highlight.min.js"></script>
 
     <!--
     CDN fallback (not active by default — activate if vendored file is unavailable):
