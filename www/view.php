@@ -14,6 +14,14 @@
     <!-- Vendored Reveal.js CSS — offline-capable -->
     <link rel="stylesheet" href="/css/vendor/reveal.min.css">
 
+    <!-- Vendored highlight.js theme — offline-capable -->
+    <link rel="stylesheet" href="/css/vendor/highlight.min.css">
+    <!--
+    CDN fallback (not active by default — activate if vendored file is unavailable):
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    -->
+
     <link rel="stylesheet" href="/css/app.css">
 
     <!--
@@ -32,6 +40,13 @@
 
     <!-- Vendored Reveal.js JS — offline-capable -->
     <script src="/js/vendor/reveal.js"></script>
+
+    <!-- Vendored highlight.js — offline-capable -->
+    <script src="/js/vendor/highlight.min.js"></script>
+    <!--
+    CDN fallback (not active by default — activate if vendored file is unavailable):
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    -->
 
     <!--
     CDN fallback (not active by default — activate if vendored file is unavailable):

@@ -7,6 +7,14 @@
    1.1 Global Reset
    ========================================================================== */
 
+/* ==========================================================================
+   0. CSS Custom Properties
+   ========================================================================== */
+
+:root {
+    --alfaslab-spacing: 0.06em;
+}
+
 *,
 *::before,
 *::after {
@@ -363,6 +371,7 @@ body {
     font-family: 'Alfa Slab One', serif;
     font-size: 4rem;
     line-height: 1.2;
+    letter-spacing: var(--alfaslab-spacing);
     color: #FFFFFF;
     margin-bottom: 0.5rem;
 }
@@ -392,6 +401,7 @@ body {
     font-family: 'Alfa Slab One', serif;
     font-size: 3rem;
     line-height: 1.2;
+    letter-spacing: var(--alfaslab-spacing);
     color: #FFFFFF;
     margin-bottom: 0.5rem;
 }
@@ -411,6 +421,7 @@ body {
     font-family: 'Alfa Slab One', serif;
     font-size: 1.8rem;
     line-height: 1.2;
+    letter-spacing: var(--alfaslab-spacing);
     color: #FFFFFF;
     margin-bottom: 1rem;
 }
@@ -422,6 +433,11 @@ body {
     padding: 1.5rem;
     text-align: left;
     margin: 0;
+}
+
+/* 4.12a Override highlight.js theme background so our rgba overlay stays in control */
+pre.hljs {
+    background: transparent;
 }
 
 /* 4.13 Example slide — code text */
@@ -439,6 +455,14 @@ body {
     font-size: 0.9rem;
     color: rgba(255, 255, 255, 0.7);
     background: transparent;
+}
+
+/* ==========================================================================
+   1.20a Sidebar example child — indented under parent JEP
+   ========================================================================== */
+
+.sidebar-item--example-child {
+    padding-left: 28px;
 }
 
 /* ==========================================================================

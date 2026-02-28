@@ -154,6 +154,12 @@ function buildExampleSlide(slide) {
     code.className   = 'example-code';
     code.textContent = slide.code_content || '';
 
+    // Apply syntax highlighting when there is code to highlight.
+    // Falls back gracefully to plain text if hljs failed to load.
+    if (slide.code_content && typeof hljs !== 'undefined') {
+        hljs.highlightElement(code);
+    }
+
     pre.appendChild(code);
     content.appendChild(pre);
     section.appendChild(content);
